@@ -421,6 +421,24 @@ class _StartScreenState extends State<StartScreen> {
                         ),
                       ),
                     ),
+                  if (_players.isNotEmpty)
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.white54, size: 16),
+                          SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Tip: during the game, long-press a player card to remove them',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white54, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 20),
                 ],
               ),
