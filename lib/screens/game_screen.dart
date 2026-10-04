@@ -229,7 +229,19 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  void _newGame() {
+  bool get _hasProgress =>
+      !gameEnded && (currentRound > 1 || currentRoundScores.values.any((s) => s != null));
+
+  Future<void> _newGame() async {
+    if (_hasProgress) {
+      final ok = await _confirm(
+        title: 'Start a new game?',
+        message: 'The unfinished game will be discarded and not saved to the statistics.',
+        confirmLabel: 'New game',
+      );
+      if (ok != true) return;
+    }
+    if (!mounted) return;
     setState(() {
       players = players
           .where((p) => !leavingIds.contains(p.id))
@@ -250,8 +262,7 @@ class _GameScreenState extends State<GameScreen> {
   // ------------------------------------------------------------ navigation
 
   Future<void> _changePlayers({bool skipConfirm = false}) async {
-    final hasProgress = !gameEnded && (currentRound > 1 || currentRoundScores.values.any((s) => s != null));
-    if (hasProgress && !skipConfirm) {
+    if (_hasProgress && !skipConfirm) {
       final ok = await _confirm(
         title: 'Change players?',
         message: 'The unfinished game will be discarded and not saved to the statistics.',
@@ -267,6 +278,39 @@ class _GameScreenState extends State<GameScreen> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => StartScreen(initialPlayers: keep)),
     );
+  }
+
+  Future<void> _showNewGameSheet() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.replay, color: Colors.white),
+              title: const Text('New game · same players',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text('Scores reset, same names. Start player rotates.',
+                  style: TextStyle(color: Colors.white70)),
+              onTap: () => Navigator.pop(context, 'same'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.group_add, color: Colors.white),
+              title: const Text('New game · new players',
+                  style: TextStyle(color: Colors.white)),
+              subtitle: const Text(
+                  'Back to setup. Current names are prefilled so you can edit them.',
+                  style: TextStyle(color: Colors.white70)),
+              onTap: () => Navigator.pop(context, 'new'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == 'same') _newGame();
+    if (choice == 'new') _changePlayers();
   }
 
   void _openStats() {
@@ -610,26 +654,20 @@ class _GameScreenState extends State<GameScreen> {
           ),
         if (players.isNotEmpty)
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _newGame,
-            tooltip: 'New Game',
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: _showNewGameSheet,
+            tooltip: 'New game',
           ),
         PopupMenuButton<String>(
           tooltip: 'More',
           color: Colors.grey[850],
           onSelected: (value) {
-            if (value == 'change') _changePlayers();
             if (value == 'stats') _openStats();
           },
           itemBuilder: (context) => const [
             PopupMenuItem(
               value: 'stats',
               child: Text('Statistics', style: TextStyle(color: Colors.white)),
-            ),
-            PopupMenuItem(
-              value: 'change',
-              child: Text('Change players',
-                  style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -891,11 +929,17 @@ class _GameScreenState extends State<GameScreen> {
       padding: const EdgeInsets.all(8),
       child: Row(
         children: [
+          IconButton(
+            onPressed: _openStats,
+            icon: const Icon(Icons.bar_chart, color: Colors.white),
+            tooltip: 'Statistics',
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: _openStats,
-              icon: const Icon(Icons.bar_chart),
-              label: const Text('Stats'),
+              onPressed: _changePlayers,
+              icon: const Icon(Icons.group_add),
+              label: const Text('New players'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: Colors.white38),
@@ -908,8 +952,8 @@ class _GameScreenState extends State<GameScreen> {
             flex: 2,
             child: ElevatedButton.icon(
               onPressed: _newGame,
-              icon: const Icon(Icons.refresh),
-              label: const Text('New Game'),
+              icon: const Icon(Icons.replay),
+              label: const Text('Play again'),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 backgroundColor: Colors.deepPurple,
