@@ -1,4 +1,4 @@
-package com.example.odin_score_keeper
+package ch.capricode.gamescores
 
 import io.flutter.embedding.android.FlutterActivity
 

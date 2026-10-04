@@ -1,6 +1,6 @@
 {
-    "name": "Odin Score Keeper",
-    "short_name": "Odin Score",
+    "name": "Odin Scores",
+    "short_name": "Odin Scores",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#f5f5f5",

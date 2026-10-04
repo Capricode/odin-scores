@@ -50,7 +50,7 @@ class StatsCalculator {
 
   static String _join(Iterable<String> names) => names.join(' & ');
 
-  static String _times(int n) => n > 1 ? ' (${n}×)' : '';
+  static String _times(int n) => n > 1 ? ' ($n×)' : '';
 
   // ---------------------------------------------------------------- awards
 
