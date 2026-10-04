@@ -61,6 +61,30 @@ flutter run
 
 Or open in your IDE (VS Code, Android Studio) and run from there.
 
+## Deploying to Netlify
+
+The app is deployed as a Flutter web build. [netlify.toml](netlify.toml) publishes `build/web` and rewrites all routes to `index.html`. Netlify's build servers don't have Flutter installed, so build locally and upload the result.
+
+### One-time setup
+
+```bash
+npm install -g netlify-cli
+netlify login
+netlify init   # or `netlify link` if the site already exists
+```
+
+### Deploy
+
+```bash
+flutter build web --release
+netlify deploy --dir=build/web            # draft deploy, gives a preview URL
+netlify deploy --dir=build/web --prod     # production
+```
+
+Without the CLI, you can also drag the `build/web` folder onto the site's **Deploys** page at app.netlify.com.
+
+Note: stats are stored in the browser's localStorage per domain, so a new Netlify URL starts with empty stats.
+
 ## Project Structure
 
 ```
