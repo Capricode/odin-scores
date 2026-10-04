@@ -18,6 +18,7 @@ A Flutter mobile app for tracking scores in the Odin card game from Helvetiq.
   - Players who leave early count as DNF: their rounds count for records, but the game doesn't count for their win rate. Ties share the win
   - Export / Import (clipboard) and Reset on the Statistics screen. On the web the stats live in the browser's localStorage, so clearing site data deletes them
 - **Change players**: ⋮ menu in the game screen
+- **Crash-safe**: The current game (players, scores, round, undo history) is saved after every change and resumed when the app is reopened. Going back to setup ("New players") discards it
 
 ## How to Use
 

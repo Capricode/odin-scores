@@ -30,4 +30,12 @@ class Player {
   Player resetScores() {
     return copyWith(scores: []);
   }
+
+  Map<String, dynamic> toJson() => {'id': id, 'n': name, 's': scores};
+
+  factory Player.fromJson(Map<String, dynamic> json) => Player(
+        id: json['id'] as String,
+        name: json['n'] as String,
+        scores: (json['s'] as List).map((e) => e as int).toList(),
+      );
 }

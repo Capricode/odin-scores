@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'screens/game_screen.dart';
 import 'screens/start_screen.dart';
+import 'utils/game_state_storage.dart';
 
-void main() {
-  runApp(const OdinScoreKeeperApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final savedGame = await GameStateStorage.load();
+  runApp(OdinScoreKeeperApp(savedGame: savedGame));
 }
 
 class OdinScoreKeeperApp extends StatelessWidget {
-  const OdinScoreKeeperApp({super.key});
+  final SavedGame? savedGame;
+
+  const OdinScoreKeeperApp({super.key, this.savedGame});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +25,7 @@ class OdinScoreKeeperApp extends StatelessWidget {
           textStyle: TextStyle(color: Colors.white),
         ),
       ),
-      home: const StartScreen(),
+      home: savedGame != null ? GameScreen(savedGame: savedGame) : const StartScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

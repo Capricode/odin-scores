@@ -5,28 +5,20 @@ import '../stats/game_record.dart';
 import '../stats/stats_calculator.dart';
 import '../stats/stats_storage.dart';
 import '../utils/avatar_text.dart';
+import '../utils/game_state_storage.dart';
 import 'start_screen.dart';
 import 'stats_screen.dart';
 
 class GameScreen extends StatefulWidget {
   final List<Player>? initialPlayers;
 
-  const GameScreen({super.key, this.initialPlayers});
+  /// A game restored after the app was closed; takes precedence over [initialPlayers].
+  final SavedGame? savedGame;
+
+  const GameScreen({super.key, this.initialPlayers, this.savedGame});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
-}
-
-class RoundSnapshot {
-  final Map<String, int> scores; // Round scores by player id
-  final int startPlayerIndex; // Start player for that round
-  final int roundNumber;
-
-  RoundSnapshot({
-    required this.scores,
-    required this.startPlayerIndex,
-    required this.roundNumber,
-  });
 }
 
 /// Everything needed to put a removed player back.
@@ -65,6 +57,8 @@ class _GameScreenState extends State<GameScreen> {
   List<RoundSnapshot> roundHistory = [];
 
   List<Award> awards = [];
+  // Set when leaving for the start screen, so the game is no longer resumed.
+  bool _discarded = false;
   Map<String, int> streaks = {};
 
   // Predefined vibrant colors for player avatars
@@ -94,13 +88,46 @@ class _GameScreenState extends State<GameScreen> {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
     _rocketController = ConfettiController(duration: const Duration(seconds: 3));
-    if (widget.initialPlayers != null) {
+    final saved = widget.savedGame;
+    if (saved != null) {
+      players = List.of(saved.players);
+      leftPlayers = List.of(saved.leftPlayers);
+      leavingIds.addAll(saved.leavingIds);
+      currentRoundScores = Map.of(saved.currentRoundScores);
+      gameEnded = saved.gameEnded;
+      currentRound = saved.currentRound;
+      startPlayerIndex = saved.startPlayerIndex;
+      roundHistory = List.of(saved.roundHistory);
+      if (gameEnded) awards = StatsCalculator.awards(_buildRecord());
+    } else if (widget.initialPlayers != null) {
       players = List.from(widget.initialPlayers!);
       currentRoundScores = {for (var p in players) p.id: null};
       // Randomly select first start player
       startPlayerIndex = DateTime.now().millisecondsSinceEpoch % players.length;
     }
     _loadStreaks();
+    _persist();
+  }
+
+  /// Every state change is saved so the game survives an app crash or reload.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _persist();
+  }
+
+  void _persist() {
+    if (_discarded || players.isEmpty) return;
+    GameStateStorage.save(SavedGame(
+      players: players,
+      leftPlayers: leftPlayers,
+      leavingIds: leavingIds,
+      currentRoundScores: currentRoundScores,
+      gameEnded: gameEnded,
+      currentRound: currentRound,
+      startPlayerIndex: startPlayerIndex,
+      roundHistory: roundHistory,
+    ));
   }
 
   @override
@@ -271,6 +298,8 @@ class _GameScreenState extends State<GameScreen> {
       if (ok != true) return;
     }
     if (!mounted) return;
+    _discarded = true;
+    GameStateStorage.clear();
     final keep = [
       for (final p in players)
         if (!leavingIds.contains(p.id)) p.resetScores(),
