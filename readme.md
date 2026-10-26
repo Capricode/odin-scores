@@ -1,8 +1,17 @@
 # Odin Score Keeper
 
-A Flutter mobile app for tracking scores in the Odin card game from Helvetiq.
+A Flutter app for tracking scores of card games. Pick the game on the start screen:
 
-## Features
+- **Odin** (Helvetiq): round-by-round scores, lowest total wins. Details below.
+- **Forest Shuffle**: scored once at the end. Each player takes a photo of their forest; a card detector finds the cards and the app calculates the points. Wrong or missing cards can be fixed by hand, and the cards in the cave are counted with a +/- stepper. Highest total wins (ties share the win). The game is saved after every change, and statistics are kept per game.
+
+### Forest Shuffle card detection
+
+The detector and the scoring rules come from [ForestDetector](https://github.com/NINI1988/ForestDetector) (MIT), which uses the card rules of [glaures/forestshuffle](https://github.com/glaures/forestshuffle) (Apache 2.0). Both were translated to Dart in `lib/games/forest_shuffle/engine/` (see `THIRD_PARTY_NOTICES.md` there). The YOLO model (`assets/models/forest_shuffle_cards.onnx`, 38 MB) runs on the device with [flutter_onnxruntime](https://pub.dev/packages/flutter_onnxruntime). On the web, ONNX Runtime Web (CPU-only build) is loaded from jsDelivr in `web/index.html` and called directly through `dart:js_interop` (`detector/onnx_model_web.dart`), because the plugin's web implementation copies tensors element by element, which made iPhone browsers kill the tab. iOS needs iOS 16 or later.
+
+The model's metadata states it is licensed AGPL-3.0, because it was trained with Ultralytics.
+
+## Odin features
 
 - **Quick Player Management**: Add players with a simple dialog
 - **Fast Score Entry**: Tap a player to add their round score (0-9 points) with a quick number grid
@@ -91,6 +100,11 @@ Note: stats are stored in the browser's localStorage per domain, so a new Netlif
 ```
 lib/
   ├── main.dart           # App entry point
+  ├── games/
+  │   ├── game_type.dart  # The games (id, name, lowest/highest wins)
+  │   ├── games.dart      # Game type -> screens and records
+  │   ├── odin/           # Odin game screen, saved state, awards, records
+  │   └── forest_shuffle/ # Forest Shuffle screens, detector, scoring engine
   ├── models/
   │   └── player.dart     # Player data model
   ├── stats/
@@ -98,9 +112,8 @@ lib/
   │   ├── stats_calculator.dart # Awards, leaderboard, streaks, records, nemesis
   │   └── stats_storage.dart    # Persistence + export/import
   └── screens/
-      ├── start_screen.dart # Add players
-      ├── game_screen.dart  # Main game screen
-      └── stats_screen.dart # Statistics
+      ├── start_screen.dart # Pick the game, add players
+      └── stats_screen.dart # Statistics per game
 test/                       # Unit tests (stats) and layout tests
 ```
 

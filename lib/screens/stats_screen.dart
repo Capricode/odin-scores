@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../games/game_picker.dart';
+import '../games/game_type.dart';
+import '../games/games.dart';
 import '../stats/game_record.dart';
 import '../stats/stats_calculator.dart';
 import '../stats/stats_storage.dart';
 
 class StatsScreen extends StatefulWidget {
-  const StatsScreen({super.key});
+  /// The game shown first; the screen can switch to the other games.
+  final GameType game;
+
+  const StatsScreen({super.key, required this.game});
 
   @override
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
 class _StatsScreenState extends State<StatsScreen> {
+  late GameType _game = widget.game;
   List<GameRecord>? _games;
 
   @override
@@ -21,9 +28,18 @@ class _StatsScreenState extends State<StatsScreen> {
   }
 
   Future<void> _reload() async {
-    final games = await StatsStorage.load();
-    if (!mounted) return;
+    final game = _game;
+    final games = await StatsStorage.load(game);
+    if (!mounted || game != _game) return;
     setState(() => _games = games);
+  }
+
+  void _switchGame(GameType game) {
+    setState(() {
+      _game = game;
+      _games = null;
+    });
+    _reload();
   }
 
   void _snack(String text) {
@@ -49,7 +65,7 @@ class _StatsScreenState extends State<StatsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Paste an export here. This replaces the stats stored on this device.',
+              'Paste an export here. This replaces the stats of all games stored on this device.',
               style: TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 12),
@@ -98,10 +114,11 @@ class _StatsScreenState extends State<StatsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
-        title: const Text('Reset all stats?', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'All saved games on this device will be deleted. This cannot be undone.',
-          style: TextStyle(color: Colors.white70),
+        title: Text('Reset ${_game.name} stats?', style: const TextStyle(color: Colors.white)),
+        content: Text(
+          'All saved ${_game.name} games on this device will be deleted. '
+          'Other games are kept. This cannot be undone.',
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
@@ -121,7 +138,7 @@ class _StatsScreenState extends State<StatsScreen> {
       ),
     );
     if (ok != true) return;
-    await StatsStorage.clear();
+    await StatsStorage.clear(_game);
     await _reload();
   }
 
@@ -167,7 +184,7 @@ class _StatsScreenState extends State<StatsScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text('Statistics', style: TextStyle(color: Colors.white)),
+        title: Text('${_game.name} statistics', style: const TextStyle(color: Colors.white)),
         backgroundColor: Colors.grey[900],
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -179,6 +196,10 @@ class _StatsScreenState extends State<StatsScreen> {
                 child: ListView(
                   padding: const EdgeInsets.only(top: 12, bottom: 24),
                   children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      child: GamePickerButton(game: _game, onChanged: _switchGame),
+                    ),
                     if (games.isEmpty)
                       _section('No games yet', [
                         const Text(
@@ -192,7 +213,8 @@ class _StatsScreenState extends State<StatsScreen> {
                       const Text(
                         'Stats live in this browser only. Clearing site data erases them, and '
                         'iPhone Safari may delete them after about a week of not visiting. '
-                        'Tip: use "Add to Home Screen" to avoid that, or export a backup.',
+                        'Tip: use "Add to Home Screen" to avoid that, or export a backup. '
+                        'Export and Import cover all games.',
                         style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
                       const SizedBox(height: 8),
@@ -201,9 +223,9 @@ class _StatsScreenState extends State<StatsScreen> {
                         runSpacing: 8,
                         children: [
                           OutlinedButton.icon(
-                            onPressed: games.isEmpty ? null : _export,
+                            onPressed: _export,
                             icon: const Icon(Icons.copy),
-                            label: const Text('Export'),
+                            label: const Text('Export all'),
                           ),
                           OutlinedButton.icon(
                             onPressed: _import,
@@ -213,7 +235,7 @@ class _StatsScreenState extends State<StatsScreen> {
                           OutlinedButton.icon(
                             onPressed: games.isEmpty ? null : _reset,
                             icon: const Icon(Icons.delete_outline),
-                            label: const Text('Reset all stats'),
+                            label: Text('Reset ${_game.name} stats'),
                             style: OutlinedButton.styleFrom(foregroundColor: Colors.red.shade300),
                           ),
                         ],
@@ -228,7 +250,7 @@ class _StatsScreenState extends State<StatsScreen> {
 
   List<Widget> _content(List<GameRecord> games) {
     final stats = StatsCalculator.playerStats(games);
-    final records = StatsCalculator.records(games);
+    final records = recordLines(_game, games);
     final nemeses = StatsCalculator.nemeses(games);
 
     return [
@@ -247,14 +269,10 @@ class _StatsScreenState extends State<StatsScreen> {
             '${s.currentStreak >= 2 ? '🔥 ' : ''}now ${s.currentStreak} · best ${s.bestStreak}',
           ),
       ]),
-      _section('Records', [
-        if (records.lowestWin != null)
-          _line('🎯 Lowest winning score', '${records.lowestWin!.value} · ${records.lowestWin!.label}'),
-        if (records.longestGame != null)
-          _line('⏳ Longest game', '${records.longestGame!.value} rounds'),
-        if (records.worstRound != null)
-          _line('💥 Worst single round', '${records.worstRound!.value} · ${records.worstRound!.label}'),
-      ]),
+      if (records.isNotEmpty)
+        _section('Records', [
+          for (final r in records) _line(r.title, r.value),
+        ]),
       _section('Nemesis 😈', [
         if (nemeses.isEmpty)
           const Text(

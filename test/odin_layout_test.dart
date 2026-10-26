@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:odin_score_keeper/models/player.dart';
-import 'package:odin_score_keeper/screens/game_screen.dart';
+import 'package:odin_score_keeper/games/odin/odin_game_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -16,7 +16,7 @@ void main() {
     final players = [
       for (var i = 0; i < 6; i++) Player(id: '$i', name: 'Player${i + 1}'),
     ];
-    await tester.pumpWidget(MaterialApp(home: GameScreen(initialPlayers: players)));
+    await tester.pumpWidget(MaterialApp(home: OdinGameScreen(initialPlayers: players)));
     await tester.pumpAndSettle();
 
     expect(find.byType(ListView), findsNothing);
@@ -39,7 +39,7 @@ void main() {
     final players = [
       for (var i = 0; i < 6; i++) Player(id: '$i', name: 'Player${i + 1}'),
     ];
-    await tester.pumpWidget(MaterialApp(home: GameScreen(initialPlayers: players)));
+    await tester.pumpWidget(MaterialApp(home: OdinGameScreen(initialPlayers: players)));
     await tester.pumpAndSettle();
 
     // Enter 0 for player 1 and 9 for the others, until the game ends.

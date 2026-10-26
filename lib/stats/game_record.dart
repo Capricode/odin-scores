@@ -1,3 +1,5 @@
+import '../games/game_type.dart';
+
 /// Case-insensitive identity used to recognise a player across games.
 String nameKey(String name) => name.trim().toLowerCase();
 
@@ -28,18 +30,24 @@ class PlayerResult {
 }
 
 class GameRecord {
+  final GameType game;
   final DateTime playedAt;
   final List<PlayerResult> players;
 
-  const GameRecord({required this.playedAt, required this.players});
+  const GameRecord({
+    this.game = GameType.odin,
+    required this.playedAt,
+    required this.players,
+  });
 
   List<PlayerResult> get finishers => players.where((p) => !p.dnf).toList();
 
-  /// Lowest total among finishers; ties share the win.
+  /// Best total among finishers (lowest or highest, depending on the game);
+  /// ties share the win.
   List<PlayerResult> get winners {
     final f = finishers;
     if (f.isEmpty) return [];
-    final best = f.map((p) => p.total).reduce((a, b) => a < b ? a : b);
+    final best = f.map((p) => p.total).reduce((a, b) => game.beats(a, b) ? a : b);
     return f.where((p) => p.total == best).toList();
   }
 
@@ -49,11 +57,13 @@ class GameRecord {
       );
 
   Map<String, dynamic> toJson() => {
+        'g': game.id,
         't': playedAt.toIso8601String(),
         'p': players.map((p) => p.toJson()).toList(),
       };
 
   factory GameRecord.fromJson(Map<String, dynamic> json) => GameRecord(
+        game: GameType.fromId(json['g'] as String?),
         playedAt: DateTime.parse(json['t'] as String),
         players: (json['p'] as List)
             .map((e) => PlayerResult.fromJson(e as Map<String, dynamic>))

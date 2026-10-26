@@ -6,6 +6,10 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo of your Forest Shuffle forest to count the points.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pick a photo of your Forest Shuffle forest to count the points.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Odin Scores</string>
 	<key>CFBundleExecutable</key>

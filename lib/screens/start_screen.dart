@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
+import '../games/game_picker.dart';
+import '../games/game_type.dart';
+import '../games/games.dart';
 import '../models/player.dart';
-import 'game_screen.dart';
 import 'stats_screen.dart';
+import '../utils/last_game_storage.dart';
 import '../utils/name_storage.dart';
 import '../utils/avatar_text.dart';
 
 class StartScreen extends StatefulWidget {
   final List<Player>? initialPlayers;
 
-  const StartScreen({super.key, this.initialPlayers});
+  /// Preselected game; defaults to the game picked last time.
+  final GameType? game;
+
+  const StartScreen({super.key, this.initialPlayers, this.game});
 
   @override
   State<StartScreen> createState() => _StartScreenState();
@@ -16,6 +22,7 @@ class StartScreen extends StatefulWidget {
 
 class _StartScreenState extends State<StartScreen> {
   final List<Player> _players = [];
+  late GameType _game = widget.game ?? GameType.odin;
   List<String> _recentNames = [];
   final TextEditingController _nameController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -30,7 +37,30 @@ class _StartScreenState extends State<StartScreen> {
       setState(() {});
     });
     _loadStoredNames();
+    if (widget.game == null) _loadLastGame();
   }
+
+  Future<void> _loadLastGame() async {
+    final game = await LastGameStorage.load();
+    if (!mounted) return;
+    setState(() => _game = game);
+  }
+
+  void _selectGame(GameType game) {
+    setState(() => _game = game);
+    LastGameStorage.save(game);
+  }
+
+  /// Recently used names that aren't in the game yet.
+  List<String> get _suggestedNames => _recentNames
+      .where((n) => !_players.any((p) => p.name.toLowerCase() == n.toLowerCase()))
+      .toList();
+
+  int? get _maxPlayers => _game.maxPlayers;
+
+  bool get _tooManyPlayers => _maxPlayers != null && _players.length > _maxPlayers!;
+
+  bool get _canStart => _players.length >= _game.minPlayers && !_tooManyPlayers;
 
   @override
   void dispose() {
@@ -183,21 +213,27 @@ class _StartScreenState extends State<StartScreen> {
   }
 
   void _startGame() {
-    if (_players.length < 2) {
+    if (!_canStart) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You need at least 2 players to start the game'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(_startHint),
+          duration: const Duration(seconds: 2),
         ),
       );
       return;
     }
 
+    LastGameStorage.save(_game);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => GameScreen(initialPlayers: _players),
+        builder: (context) => gameScreen(_game, _players),
       ),
     );
+  }
+
+  String get _startHint {
+    if (_tooManyPlayers) return '${_game.name} is for at most $_maxPlayers players';
+    return 'Add at least ${_game.minPlayers} players';
   }
 
   @override
@@ -217,10 +253,15 @@ class _StartScreenState extends State<StartScreen> {
                       icon: const Icon(Icons.bar_chart, color: Colors.white70),
                       tooltip: 'Statistics',
                       onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const StatsScreen()),
+                        MaterialPageRoute(builder: (_) => StatsScreen(game: _game)),
                       ),
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: GamePickerButton(game: _game, onChanged: _selectGame),
+                  ),
+                  const SizedBox(height: 24),
                   const Text(
                     'Add New Player',
                     style: TextStyle(
@@ -298,7 +339,7 @@ class _StartScreenState extends State<StartScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  if (_recentNames.isNotEmpty)
+                  if (_suggestedNames.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
@@ -316,7 +357,7 @@ class _StartScreenState extends State<StartScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: _recentNames
+                            children: _suggestedNames
                                 .map(
                                   (name) => InputChip(
                                     label: Text(name),
@@ -330,7 +371,7 @@ class _StartScreenState extends State<StartScreen> {
                         ],
                       ),
                     ),
-                  if (_recentNames.isNotEmpty) const SizedBox(height: 20),
+                  if (_suggestedNames.isNotEmpty) const SizedBox(height: 20),
                   // Players list
                   if (_players.isNotEmpty)
                     Container(
@@ -400,28 +441,22 @@ class _StartScreenState extends State<StartScreen> {
                       child: SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _players.length >= 2 ? _startGame : null,
+                          onPressed: _canStart ? _startGame : null,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 20),
-                            backgroundColor: _players.length >= 2
-                                ? Colors.deepPurple
-                                : Colors.grey[800],
-                            foregroundColor: _players.length >= 2
-                                ? Colors.white
-                                : Colors.grey[600],
+                            backgroundColor: _canStart ? _game.color : Colors.grey[800],
+                            foregroundColor: _canStart ? Colors.white : Colors.grey[600],
                             disabledBackgroundColor: Colors.grey[800],
                             disabledForegroundColor: Colors.grey[600],
                           ),
                           child: Text(
-                            _players.length >= 2
-                                ? 'Start Game'
-                                : 'Add at least 2 players',
+                            _canStart ? 'Start ${_game.name}' : _startHint,
                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
                     ),
-                  if (_players.isNotEmpty)
+                  if (_players.isNotEmpty && _game == GameType.odin)
                     const Padding(
                       padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
                       child: Row(
