@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
-import '../models/player.dart';
-import '../stats/game_record.dart';
-import '../stats/stats_calculator.dart';
-import '../stats/stats_storage.dart';
-import '../utils/avatar_text.dart';
-import '../utils/game_state_storage.dart';
-import 'start_screen.dart';
-import 'stats_screen.dart';
+import '../../models/player.dart';
+import '../../screens/start_screen.dart';
+import '../../screens/stats_screen.dart';
+import '../../stats/game_record.dart';
+import '../../stats/stats_calculator.dart';
+import '../../stats/stats_storage.dart';
+import '../../utils/avatar_text.dart';
+import '../../utils/game_state_storage.dart';
+import '../game_type.dart';
+import 'odin_saved_game.dart';
+import 'odin_stats.dart';
 
-class GameScreen extends StatefulWidget {
+class OdinGameScreen extends StatefulWidget {
   final List<Player>? initialPlayers;
 
   /// A game restored after the app was closed; takes precedence over [initialPlayers].
   final SavedGame? savedGame;
 
-  const GameScreen({super.key, this.initialPlayers, this.savedGame});
+  const OdinGameScreen({super.key, this.initialPlayers, this.savedGame});
 
   @override
-  State<GameScreen> createState() => _GameScreenState();
+  State<OdinGameScreen> createState() => _OdinGameScreenState();
 }
 
 /// Everything needed to put a removed player back.
@@ -38,7 +41,7 @@ class _RemovalBackup {
   });
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _OdinGameScreenState extends State<OdinGameScreen> {
   static const int _winScoreLimit = 15;
 
   List<Player> players = [];
@@ -98,7 +101,7 @@ class _GameScreenState extends State<GameScreen> {
       currentRound = saved.currentRound;
       startPlayerIndex = saved.startPlayerIndex;
       roundHistory = List.of(saved.roundHistory);
-      if (gameEnded) awards = StatsCalculator.awards(_buildRecord());
+      if (gameEnded) awards = OdinStats.awards(_buildRecord());
     } else if (widget.initialPlayers != null) {
       players = List.from(widget.initialPlayers!);
       currentRoundScores = {for (var p in players) p.id: null};
@@ -118,16 +121,19 @@ class _GameScreenState extends State<GameScreen> {
 
   void _persist() {
     if (_discarded || players.isEmpty) return;
-    GameStateStorage.save(SavedGame(
-      players: players,
-      leftPlayers: leftPlayers,
-      leavingIds: leavingIds,
-      currentRoundScores: currentRoundScores,
-      gameEnded: gameEnded,
-      currentRound: currentRound,
-      startPlayerIndex: startPlayerIndex,
-      roundHistory: roundHistory,
-    ));
+    GameStateStorage.save(
+      GameType.odin,
+      SavedGame(
+        players: players,
+        leftPlayers: leftPlayers,
+        leavingIds: leavingIds,
+        currentRoundScores: currentRoundScores,
+        gameEnded: gameEnded,
+        currentRound: currentRound,
+        startPlayerIndex: startPlayerIndex,
+        roundHistory: roundHistory,
+      ).toJson(),
+    );
   }
 
   @override
@@ -138,7 +144,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Future<void> _loadStreaks() async {
-    final games = await StatsStorage.load();
+    final games = await StatsStorage.load(GameType.odin);
     if (!mounted) return;
     setState(() {
       streaks = StatsCalculator.currentStreaks(games);
@@ -214,7 +220,7 @@ class _GameScreenState extends State<GameScreen> {
     // Trigger celebration and save stats when game just ended
     if (!wasEnded && gameEnded) {
       final record = _buildRecord();
-      awards = StatsCalculator.awards(record);
+      awards = OdinStats.awards(record);
       StatsStorage.saveGame(record).then((_) => _loadStreaks());
 
       final celebrateRocket = _getWinners().any((w) {
@@ -233,6 +239,7 @@ class _GameScreenState extends State<GameScreen> {
     PlayerResult toResult(Player p, bool dnf) =>
         PlayerResult(name: p.name, scores: List.of(p.scores), dnf: dnf);
     return GameRecord(
+      game: GameType.odin,
       playedAt: DateTime.now(),
       players: [
         ...players.map((p) => toResult(p, false)),
@@ -305,7 +312,9 @@ class _GameScreenState extends State<GameScreen> {
         if (!leavingIds.contains(p.id)) p.resetScores(),
     ];
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => StartScreen(initialPlayers: keep)),
+      MaterialPageRoute(
+        builder: (_) => StartScreen(initialPlayers: keep, game: GameType.odin),
+      ),
     );
   }
 
@@ -343,7 +352,9 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _openStats() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StatsScreen()));
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const StatsScreen(game: GameType.odin)),
+    );
   }
 
   Future<bool?> _confirm({
@@ -967,19 +978,18 @@ class _GameScreenState extends State<GameScreen> {
           Expanded(
             child: OutlinedButton.icon(
               onPressed: _changePlayers,
-              icon: const Icon(Icons.group_add),
-              label: const Text('New players'),
+              icon: const Icon(Icons.add),
+              label: const Text('New game'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: Colors.white38),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               ),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            flex: 2,
-            child: ElevatedButton.icon(
+                        child: ElevatedButton.icon(
               onPressed: _newGame,
               icon: const Icon(Icons.replay),
               label: const Text('Play again'),

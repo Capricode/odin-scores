@@ -1,9 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:odin_score_keeper/games/game_type.dart';
+import 'package:odin_score_keeper/games/odin/odin_stats.dart';
 import 'package:odin_score_keeper/stats/game_record.dart';
 import 'package:odin_score_keeper/stats/stats_calculator.dart';
 
-GameRecord game(Map<String, List<int>> players, {Set<String> dnf = const {}, int day = 1}) {
+GameRecord game(
+  Map<String, List<int>> players, {
+  Set<String> dnf = const {},
+  int day = 1,
+  GameType type = GameType.odin,
+}) {
   return GameRecord(
+    game: type,
     playedAt: DateTime(2026, 1, day),
     players: [
       for (final e in players.entries)
@@ -19,6 +27,11 @@ void main() {
       expect(g.winners.map((w) => w.name), ['Ben', 'Cy']);
     });
 
+    test('highest total wins in Forest Shuffle', () {
+      final g = game({'Anna': [40, 10], 'Ben': [30, 5]}, type: GameType.forestShuffle);
+      expect(g.winners.map((w) => w.name), ['Anna']);
+    });
+
     test('players who left cannot win', () {
       final g = game({'Anna': [0, 0], 'Ben': [4, 4, 8]}, dnf: {'Anna'});
       expect(g.winners.map((w) => w.name), ['Ben']);
@@ -30,25 +43,25 @@ void main() {
         a.where((x) => x.title == title).map((x) => x.detail).firstOrNull;
 
     test('ice cold lists most zeros, hidden when nobody has a zero', () {
-      final a = StatsCalculator.awards(game({'A': [0, 0, 9, 7], 'B': [0, 3, 3, 9]}));
+      final a = OdinStats.awards(game({'A': [0, 0, 9, 7], 'B': [0, 3, 3, 9]}));
       expect(detail(a, 'Ice Cold'), 'A (2×)');
-      final none = StatsCalculator.awards(game({'A': [1, 2], 'B': [3, 4]}));
+      final none = OdinStats.awards(game({'A': [1, 2], 'B': [3, 4]}));
       expect(detail(none, 'Ice Cold'), isNull);
     });
 
     test('disaster round needs 7 or more', () {
-      expect(detail(StatsCalculator.awards(game({'A': [6, 1], 'B': [2, 2]})), 'Disaster Round'), isNull);
-      expect(detail(StatsCalculator.awards(game({'A': [7, 1], 'B': [2, 2]})), 'Disaster Round'), 'A (7)');
+      expect(detail(OdinStats.awards(game({'A': [6, 1], 'B': [2, 2]})), 'Disaster Round'), isNull);
+      expect(detail(OdinStats.awards(game({'A': [7, 1], 'B': [2, 2]})), 'Disaster Round'), 'A (7)');
     });
 
     test('close call is a finisher on exactly 14', () {
-      final a = StatsCalculator.awards(game({'A': [7, 7], 'B': [1, 1, 1, 1]}));
+      final a = OdinStats.awards(game({'A': [7, 7], 'B': [1, 1, 1, 1]}));
       expect(detail(a, 'Close Call'), 'A');
     });
 
     test('comeback: winner alone in last place after round 2+', () {
       // After round 2: A=9, B=2 -> A alone last. A finishes lowest.
-      final a = StatsCalculator.awards(game({
+      final a = OdinStats.awards(game({
         'A': [5, 4, 0, 0, 0, 0, 0, 0],
         'B': [1, 1, 5, 5, 5, 5, 5, 5],
       }));
@@ -56,13 +69,13 @@ void main() {
     });
 
     test('no comeback when last place was only in round 1 or shared', () {
-      final round1Only = StatsCalculator.awards(game({
+      final round1Only = OdinStats.awards(game({
         'A': [5, 0, 0, 0],
         'B': [0, 5, 5, 5],
       }));
       expect(detail(round1Only, 'Comeback'), isNull);
 
-      final shared = StatsCalculator.awards(game({'A': [3, 3, 0, 0, 0], 'B': [3, 3, 9, 9, 9]}));
+      final shared = OdinStats.awards(game({'A': [3, 3, 0, 0, 0], 'B': [3, 3, 9, 9, 9]}));
       expect(detail(shared, 'Comeback'), isNull);
     });
   });
@@ -106,7 +119,7 @@ void main() {
         game({'A': [2, 2, 2], 'B': [9, 9]}),
         game({'A': [1, 1, 1, 1, 1], 'B': [5, 5, 8], 'C': [9]}, dnf: {'C'}),
       ];
-      final r = StatsCalculator.records(games);
+      final r = OdinStats.records(games);
       expect(r.lowestWin!.value, 5);
       expect(r.lowestWin!.label, 'A');
       expect(r.longestGame!.value, 5);
@@ -115,7 +128,7 @@ void main() {
     });
 
     test('empty history has no records', () {
-      final r = StatsCalculator.records([]);
+      final r = OdinStats.records([]);
       expect(r.lowestWin, isNull);
       expect(r.worstRound, isNull);
     });
@@ -142,10 +155,25 @@ void main() {
   });
 
   test('records survive a JSON round trip', () {
-    final g = game({'A': [1, 2], 'B': [3]}, dnf: {'B'});
+    final g = game({'A': [1, 2], 'B': [3]}, dnf: {'B'}, type: GameType.forestShuffle);
     final copy = GameRecord.fromJson(g.toJson());
+    expect(copy.game, GameType.forestShuffle);
     expect(copy.players[1].dnf, true);
     expect(copy.players[0].scores, [1, 2]);
     expect(copy.playedAt, g.playedAt);
+  });
+
+  test('records saved before multi-game support are Odin games', () {
+    final json = game({'A': [1]}).toJson()..remove('g');
+    expect(GameRecord.fromJson(json).game, GameType.odin);
+  });
+
+  test('nemesis in Forest Shuffle is the opponent with more points', () {
+    final n = StatsCalculator.nemeses([
+      for (var d = 1; d <= 3; d++)
+        game({'Anna': [50], 'Ben': [70]}, day: d, type: GameType.forestShuffle),
+    ]);
+    expect(n.single.player, 'Anna');
+    expect(n.single.nemeses, ['Ben']);
   });
 }
